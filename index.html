@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Industrial Leap - Corporate Multiplayer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0a;
+    font-family: 'Courier Prime', monospace;
+    overflow: hidden;
+    touch-action: manipulation;
+    user-select: none;
+  }
+
+  #wrap {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(180deg, #0e1a2a 0%, #05090f 60%, #000 100%);
+  }
+
+  #canvas-main {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: block;
+  }
+
+  /* HUD Styling */
+  #hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 50;
+    pointer-events: none;
+  }
+
+  .hud-panel {
+    background: rgba(0,0,0,0.65);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 10px 16px;
+    backdrop-filter: blur(6px);
+    pointer-events: auto;
+  }
+
+  .hud-left { border-left: 3px solid #d97706; }
+  .hud-right { border-right: 3px solid #4b5563; text-align: right; }
+
+  .hud-money {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fbbf24;
+    letter-spacing: -0.05em;
+  }
+
+  .hud-sub {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+
+  .hud-high {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    font-weight: 700;
+  }
+
+  #lobby-tag {
+    font-size: 0.65rem;
+    color: #3b82f6;
+    margin-top: 4px;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+  }
+
+  /* Safety Mode toggle in HUD */
+  .safety-toggle-wrap {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  .safety-toggle-btn {
+    background: #064e3b;
+    border: 1px solid #059669;
+    color: #34d399;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.6rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+  }
+
+  .safety-toggle-btn.disabled {
+    background: #7f1d1d;
+    border-color: #ef4444;
+    color: #fca5a5;
+  }
+
+  /* SYSTEM LOG TOAST */
+  #death-ticker {
+    position: absolute;
+    bottom: 16px; right: 16px;
+    background: rgba(127,29,29,0.92);
+    border-left: 3px solid #f87171;
+    color: #fca5a5;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 8px 14px;
+    z-index: 60;
+    pointer-events: none;
+    display: none;
+    animation: slide-in 0.3s ease;
+  }
+
+  @keyframes slide-in {
+    from { transform: translateX(120%); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+
+  /* Shake animation */
+  @keyframes shake {
+    0%,100% { transform: none; }
+    20%,60% { transform: translateX(-3px); }
+    40%,80% { transform: translateX(3px); }
+  }
+  .do-shake { animation: shake 0.2s ease; }
+
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+  }
+
+  .panel {
+    background: #111;
+    border: 1px solid #2d2d2d;
+    border-top: 6px solid #374151;
+    padding: 36px 32px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .panel h1 {
+    font-size: 2.6rem;
+    font-weight: 700;
+    font-style: italic;
+    color: #fff;
+    letter-spacing: -0.06em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .panel .tagline {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: #4b5563;
+    margin-bottom: 28px;
+  }
+
+  .char-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .char-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 3px solid rgba(0,0,0,0.5);
+    color: #fff;
+    font-family: 'Courier Prime', monospace;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 14px 10px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    letter-spacing: 0.05em;
+  }
+
+  .char-btn:hover { background: rgba(255,255,255,0.12); transform: translateY(-2px); }
+  .char-btn:active { transform: translateY(1px); }
+
+  .char-btn.blue   { border-left: 3px solid #3b82f6; }
+  .char-btn.red     { border-left: 3px solid #ef4444; }
+  .char-btn.green   { border-left: 3px solid #22c55e; }
+  .char-btn.purple { border-left: 3px solid #a855f7; }
+  .char-btn.mono   { grid-column: span 2; border-left: 3px solid #6b7280; }
+
+  .hint {
+    font-size: 0.6rem;
+    color: #4b5563;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-top: 12px;
+  }
+
+  #connection-status {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    color: #10b981;
+    margin-top: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  #death-screen { display: none; }
+
+  .death-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #ef4444;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 20px;
+  }
+
+  .death-row {
+    border-top: 1px solid #1f2937;
+    border-bottom: 1px solid #1f2937;
+    padding: 14px 0;
+    margin: 16px 0;
+  }
+
+  .death-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #4b5563;
+    margin-bottom: 6px;
+  }
+
+  #death-reason {
+    font-size: 0.8rem;
+    color: #fca5a5;
+    background: rgba(127,29,29,0.25);
+    padding: 6px 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-block;
+  }
+
+  #death-quote {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-style: italic;
+    line-height: 1.6;
+    margin: 16px 0;
+  }
+
+  .score-box {
+    background: #000;
+    border: 1px solid #1f2937;
+    padding: 16px;
+    margin: 16px 0;
+  }
+
+  .score-box .label { font-size: 0.6rem; text-transform: uppercase; color: #4b5563; margin-bottom: 4px; letter-spacing: 0.2em; }
+  .score-box .val   { font-size: 3rem; font-weight: 700; color: #fbbf24; font-style: italic; letter-spacing: -0.05em; }
+
+  .countdown-wrap { margin-top: 20px; }
+  .countdown-label { font-size: 0.6rem; text-transform: uppercase; color: #374151; letter-spacing: 0.2em; margin-bottom: 6px; }
+  #countdown { font-size: 4rem; font-weight: 700; color: #fff; line-height: 1; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="stars-canvas" style="position:absolute;inset:0;z-index:0;pointer-events:none;"></canvas>
+  <canvas id="canvas-main"></canvas>
+
+  <!-- HUD Interface -->
+  <div id="hud">
+    <div class="hud-panel hud-left">
+      <div class="hud-money" id="hud-money">BUDGET: $0</div>
+      <div class="hud-sub" id="hud-sub">OPERATION: CONTINUOUS PROFIT</div>
+    </div>
+    <div class="hud-panel hud-right">
+      <div class="hud-high" id="hud-best">BEST: $0</div>
+      <div class="hud-sub" id="hud-sub-best">PERSONAL RECORD</div>
+      <div id="lobby-tag">MULTIPLAYER ACTIVE</div>
+      <div class="safety-toggle-wrap">
+        <span class="hud-sub" style="margin: 0;">SAFETY TETHER:</span>
+        <button id="safety-btn" class="safety-toggle-btn disabled">OFFLINE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="death-ticker"></div>
+
+  <!-- OVERLAY LAYERS -->
+  <div id="overlay">
+    <div class="panel">
+      <!-- Start screen -->
+      <div id="start-screen">
+        <h1>INDUSTRIAL<br>LEAP</h1>
+        <p class="tagline">Corporate Suffering Framework</p>
+        <div class="char-grid">
+          <button class="char-btn blue"    onclick="startGame('AVIRUP')">👷 AVIRUP</button>
+          <button class="char-btn red"     onclick="startGame('LAMA')">🧔 LAMA</button>
+          <button class="char-btn green"   onclick="startGame('MASOOM')">👨‍🏭 MASOOM</button>
+          <button class="char-btn purple" onclick="startGame('SAGAR')">👮 SAGAR</button>
+          <button class="char-btn mono"    onclick="startGame('PRAVEEN')">🧑‍💻 PRAVEEN</button>
+        </div>
+        <p class="hint">SPACE / CLICK / TAP TO JUMP</p>
+        <div id="connection-status">Connecting to Corporate Network...</div>
+      </div>
+
+      <!-- Death screen -->
+      <div id="death-screen">
+        <p class="death-title">CONTRACT<br>TERMINATED</p>
+        <div class="death-row">
+          <div class="death-label">Reason for Termination</div>
+          <span id="death-reason">—</span>
+        </div>
+        <p id="death-quote">"Your sacrifice was marginally profitable."</p>
+        <div class="score-box">
+          <div class="label">Shared Debt Accrued</div>
+          <div class="val" id="lost-money">$0</div>
+        </div>
+        <div class="countdown-wrap">
+          <div class="countdown-label">Next Shift Starting In</div>
+          <div id="countdown">5</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Import Firebase Module SDK Engine -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBuHMgngzdgt_BDC6h4YEQVymDVmEbLs60",
+    authDomain: "industrialleap.firebaseapp.com",
+    databaseURL: "https://industrialleap-default-rtdb.firebaseio.com",
+    projectId: "industrialleap",
+    storageBucket: "industrialleap.firebasestorage.app",
+    messagingSenderId: "1078886721555",
+    appId: "1:1078886721555:web:22c18409c58909f92c37e6"
+  };
+
+  const COLORS = {
+    BRICK:    { main: '#7b2d2d', dark: '#5c1f1f', stripe: '#a03535' },
+    CONCRETE: { main: '#4a5568', dark: '#2d3748', stripe: '#5a6780' },
+    METAL:    { main: '#1e3a5f', dark: '#162d4a', stripe: '#2a4e7c' },
+    STEEL:    { main: '#1f2d3d', dark: '#151e2a', stripe: '#2c3e52' }
+  };
+
+  const SLOGANS = [
+    "OPERATION: CONTINUOUS PROFIT",
+    "SPINE IS COMPANY PROPERTY",
+    "LUNCH BREAKS: DEBT-COLLECTIBLE",
+    "REVENUE BEFORE RESPIRATION",
+    "UNPAID OVERTIME IS A PRIVILEGE",
+    "SMILE: YOU'RE BEING LEVERAGED",
+    "PRODUCTIVITY IS THE ONLY PULSE",
+    "DON'T LOOK DOWN, LOOK AT MARGINS"
+  ];
+
+  const REASONS = [
+    "UNAUTHORIZED GRAVITATIONAL DESCENT",
+    "KINETIC IMPACT RESTRUCTURING",
+    "REDUNDANT BIOLOGICAL SYSTEM",
+    "FAILURE TO DEFY PHYSICS",
+    "UNSCHEDULED FLOOR INSPECTION",
+    "OSHA-VIOLATING FALL TRAJECTORY",
+    "SUDDEN CONTRACT EXPIRATION",
+    "EQUIPMENT DAMAGE VIA BODY IMPACT"
+  ];
+
+  const QUOTES = [
+    "Your family will not be notified.",
+    "HR has already filled your position.",
+    "That fall was not covered by insurance.",
+    "We've deducted the cost of the floor from your final pay.",
+    "The shareholders are disappointed in your performance.",
+    "Your badge has been remotely deactivated.",
+    "Your locker contents have been auctioned.",
+    "Your carbon footprint has been successfully deleted."
+  ];
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const auth = getAuth(app);
+
+  const playerImages = {};
+  const CHAR_NAMES = ['AVIRUP', 'LAMA', 'MASOOM', 'SAGAR', 'PRAVEEN'];
+  CHAR_NAMES.forEach(name => {
+    const img = new Image();
+    img.src = `${name.toLowerCase()}.png`;
+    img.onload = () => {
+      playerImages[name] = img;
+    };
+    img.onerror = () => {
+      console.warn(`Could not load avatar: ${name.toLowerCase()}.png, using fallback emoji.`);
+    };
+  });
+
+  let databaseReady = false;
+  let mySessionUid = "";
+  let currentCharacter = "AVIRUP";
+  let ghostPlayers = {};
+  let safetyTetherActive = false; // Punishing difficulty baseline by default
+
+  const safetyBtn = document.getElementById("safety-btn");
+  safetyBtn.addEventListener("click", () => {
+    safetyTetherActive = !safetyTetherActive;
+    if (safetyTetherActive) {
+      safetyBtn.textContent = "ACTIVE";
+      safetyBtn.classList.remove("disabled");
+      addSystemLog("Safety Harness: SECURED");
+    } else {
+      safetyBtn.textContent = "OFFLINE";
+      safetyBtn.classList.add("disabled");
+      addSystemLog("Safety Harness: BYPASSED (DANGER)");
+    }
+  });
+
+  signInAnonymously(auth).then(() => {
+    databaseReady = true;
+    document.getElementById("connection-status").textContent = "CONNECTED TO SANDBOX NETWORK";
+    document.getElementById("connection-status").style.color = "#10b981";
+    setupGhostListener();
+  }).catch((err) => {
+    console.error("Firebase auth failed:", err);
+    document.getElementById("connection-status").textContent = "OFFLINE MODE - LOCAL ONLY";
+    document.getElementById("connection-status").style.color = "#f87171";
+  });
+
+  const canvas = document.getElementById('canvas-main');
+  const ctx    = canvas.getContext('2d');
+  const starsC = document.getElementById('stars-canvas');
+  const starsX = starsC.getContext('2d');
+  const wrap   = document.getElementById('wrap');
+
+  // Virtual game dimensions to guarantee resolution-agnostic physical logic
+  const V_W = 1200;
+  const V_H = 700;
+
+  // Actual display dimensions
+  let W, H;
+  let gState   = 'START'; // START | PLAYING | DEAD
+  let money    = 0;
+  let bestScore= 0;
+  let speed, frameCount;
+
+  // Core Physics Consts (all relative to Virtual 1200x700 environment)
+  const BASE_SPEED   = 5.5;
+  const GRAVITY      = 0.68;
+  const JUMP_STR     = -15.5;
+  const PLAYER_W     = 46;
+  const PLAYER_H     = 46;
+
+  const player = {
+    globalX: 150, 
+    x: 150,       
+    y: 0,
+    vy: 0,
+    w: PLAYER_W, h: PLAYER_H,
+    grounded: false,
+    rot: 0, targetRot: 0,
+    dead: false
+  };
+
+  const emojiMap = { AVIRUP:'👷', LAMA:'🧔', MASOOM:'👨‍🏭', SAGAR:'👮', PRAVEEN:'🧑‍💻' };
+
+  function drawAvatar(x, y, w, h, rot, charName, alpha = 1) {
+    const img = playerImages[charName];
+    if (img && img.complete && img.naturalWidth !== 0) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate(rot);
+
+      // Create a round clipping region for the avatar
+      ctx.beginPath();
+      ctx.arc(0, 0, w / 2, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Draw the user provided picture centered
+      ctx.drawImage(img, -w/2, -h/2, w, h);
+      ctx.restore();
+
+      // Draw clean styled ring overlay to indicate identity (Indigo = Local, Pink = Ghost)
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate(rot);
+      ctx.strokeStyle = charName === currentCharacter ? '#6366f1' : '#ec4899';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, w / 2 - 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      // High-fidelity Emoji Fallback if image files aren't physically present yet
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate(rot);
+      ctx.font = '44px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(emojiMap[charName] || '👤', 0, 0);
+      ctx.restore();
+    }
+  }
+
+  function drawPlayer(e, alpha=1) {
+    drawAvatar(e.x, e.y, e.w, e.h, e.rot, currentCharacter, alpha);
+  }
+
+  function updateAndDrawGhostPlayers() {
+    const currentCameraX = player.globalX - player.x;
+
+    Object.entries(ghostPlayers).forEach(([uid, ghost]) => {
+      if (uid === mySessionUid) return;
+      if (Date.now() - ghost.timestamp > 7000) return;
+
+      // 1. Prediction: Extrapolate forward movement using local run velocity to bridge updates
+      if (gState === 'PLAYING') {
+        ghost.currentGlobalX += speed;
+      }
+
+      // 2. Correction: Smoothly pull (interpolate) ghost towards authoritative DB values
+      ghost.currentGlobalX += (ghost.targetGlobalX - ghost.currentGlobalX) * 0.12;
+      ghost.currentY       += (ghost.targetY - ghost.currentY) * 0.15;
+      ghost.currentRot     += (ghost.targetRot - ghost.currentRot) * 0.15;
+
+      // Map to shared virtual screen space
+      const screenX = ghost.currentGlobalX - currentCameraX;
+      const screenY = ghost.currentY;
+
+      if (screenX + PLAYER_W < -100 || screenX > V_W + 100) return;
+
+      // Render Ghost Character circular avatar
+      drawAvatar(screenX, screenY, PLAYER_W, PLAYER_H, ghost.currentRot || 0, ghost.character, 0.55);
+
+      // Render Ghost Nametag
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      
+      const tag = uid.split('_')[0]; 
+      ctx.fillText(tag, screenX + PLAYER_W/2, screenY - 12);
+    });
+  }
+
+  function physicsTick(e, isLocal) {
+    e.vy += GRAVITY;
+    e.y  += e.vy;
+
+    const wasGrounded = e.grounded;
+    e.grounded = false;
+
+    platforms.forEach(p => {
+      const bottom = e.y + e.h;
+      
+      if (e.globalX + e.w > p.x && e.globalX < p.x + p.w &&
+          bottom > p.y && bottom < p.y + p.h + 24 && e.vy >= 0) {
+        e.y = p.y - e.h;
+        e.vy = 0;
+        e.grounded = true;
+        e.rot = 0; e.targetRot = 0;
+        
+        if (!wasGrounded && isLocal) {
+          playSfx('land');
+          spawnLandParticles(e.x + e.w/2, e.y + e.h);
+          wrap.classList.remove('do-shake');
+          void wrap.offsetWidth;
+          wrap.classList.add('do-shake');
+        }
+      }
+    });
+
+    if (!e.grounded) {
+      const rs = 0.14;
+      if (e.rot < e.targetRot) {
+        e.rot = Math.min(e.rot + rs, e.targetRot);
+      }
+    }
+
+    // Danger triggers
+    if (isLocal && e.y > V_H + 100) {
+      if (safetyTetherActive) {
+        // OSHA SAFETY HARNESS ACTIVATED
+        let safetyTargetY = V_H - 300;
+        let closestPlatform = null;
+        let minDiff = Infinity;
+        
+        platforms.forEach(p => {
+          if (e.globalX + e.w > p.x && e.globalX < p.x + p.w) {
+            closestPlatform = p;
+          }
+        });
+
+        if (!closestPlatform && platforms.length > 0) {
+          platforms.forEach(p => {
+            const diff = Math.abs(p.x - e.globalX);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestPlatform = p;
+            }
+          });
+        }
+
+        if (closestPlatform) {
+          safetyTargetY = closestPlatform.y - e.h - 120;
+          e.globalX = closestPlatform.x + 30;
+        }
+
+        e.y = safetyTargetY;
+        e.vy = -6; 
+        e.rot = 0;
+        e.targetRot = 0;
+        money = Math.max(0, money - 5); 
+        updateHUD();
+        playSfx('coin'); 
+        spawnFloatingText(e.x + e.w/2, V_H / 2, '-$5 RESCUE FEE', '#f87171');
+        addSystemLog("SAFETY TETHER RESCUE: -$5 PENALTY");
+      } else {
+        die();
+      }
+    }
+  }
+
+  function jump() {
+    if (gState !== 'PLAYING') return;
+    if (player.grounded) {
+      player.vy = JUMP_STR;
+      player.grounded = false;
+      player.targetRot += Math.PI * 2;
+      playSfx('jump');
+    }
+  }
+
+  const FIXED_BUILDINGS_BASE = [
+    [0, 850, 250, 'CONCRETE'],
+    [1100, 480, 310, 'BRICK'],
+    [1850, 520, 200, 'METAL'],
+    [2650, 560, 380, 'STEEL'],
+    [3490, 420, 240, 'CONCRETE'],
+    [4170, 500, 320, 'BRICK'],
+    [4950, 480, 180, 'METAL'],
+    [5710, 600, 290, 'STEEL'],
+    [6600, 480, 360, 'BRICK'],
+    [7340, 520, 220, 'CONCRETE'],
+    [8120, 550, 280, 'METAL'],
+    [8950, 620, 340, 'STEEL']
+  ];
+
+  let platforms = [];
+  let coins     = [];
+  let bgBuildings = [];
+
+  function syncFixedPlatforms() {
+    platforms = [];
+    coins = [];
+    let seedVal = 42;
+    function localRng() {
+      let x = Math.sin(seedVal++) * 10000;
+      return x - Math.floor(x);
+    }
+
+    const loopLength = 9800;
+    const currentLoopIndex = Math.floor((player.globalX - player.x) / loopLength);
+
+    for (let loopOffset = -1; loopOffset <= 2; loopOffset++) {
+      const baseOffset = (currentLoopIndex + loopOffset) * loopLength;
+
+      FIXED_BUILDINGS_BASE.forEach(build => {
+        const pX = build[0] + baseOffset;
+        const pW = build[1];
+        const pH = build[2];
+        const type = build[3];
+        const pY = V_H - pH;
+
+        platforms.push({ x: pX, y: pY, w: pW, h: pH, type });
+
+        if (localRng() > 0.35) {
+          coins.push({
+            x: pX + localRng() * (pW - 60) + 30,
+            y: pY - 60 - localRng() * 120,
+            r: 14,
+            collected: false,
+            t: 0
+          });
+        }
+      });
+    }
+  }
+
+  function drawStars() {
+    starsC.width = window.innerWidth;
+    starsC.height = window.innerHeight;
+    starsX.clearRect(0, 0, starsC.width, starsC.height);
+    for (let i = 0; i < 180; i++) {
+      const x = Math.random() * starsC.width;
+      const y = Math.random() * starsC.height * 0.7;
+      const r = Math.random() * 1.2 + 0.2;
+      const a = Math.random() * 0.7 + 0.1;
+      starsX.beginPath();
+      starsX.arc(x, y, r, 0, Math.PI * 2);
+      starsX.fillStyle = `rgba(255, 255, 255, ${a})`;
+      starsX.fill();
+    }
+  }
+
+  function initBg() {
+    bgBuildings = [];
+    for (let i = 0; i < 25; i++) {
+      bgBuildings.push({
+        x: Math.random() * V_W * 2,
+        w: 50 + Math.random() * 120,
+        h: 100 + Math.random() * V_H * 0.5,
+        speed: 0.8 + Math.random() * 1.2,
+        col: `hsl(${210 + Math.random() * 30}, 12%, ${6 + Math.random() * 8}%)`
+      });
+    }
+  }
+
+  function updateBg() {
+    bgBuildings.forEach(b => {
+      b.x -= b.speed;
+      if (b.x + b.w < 0) {
+        b.x = V_W + Math.random() * 400;
+        b.h = 100 + Math.random() * V_H * 0.5;
+      }
+    });
+  }
+
+  function drawBg() {
+    bgBuildings.forEach(b => {
+      ctx.fillStyle = b.col;
+      ctx.fillRect(b.x, V_H - b.h, b.w, b.h);
+      
+      // Draw windows
+      ctx.fillStyle = 'rgba(255, 220, 80, 0.08)';
+      for (let wy = V_H - b.h + 15; wy < V_H - 20; wy += 25) {
+        for (let wx = b.x + 10; wx < b.x + b.w - 15; wx += 20) {
+          if (Math.random() > 0.6) {
+            ctx.fillRect(wx, wy, 8, 12);
+          }
+        }
+      }
+    });
+  }
+
+  function drawPlatform(p) {
+    const currentCameraX = player.globalX - player.x;
+    const renderX = p.x - currentCameraX;
+    if (renderX + p.w < -100 || renderX > V_W + 100) return;
+
+    const c = COLORS[p.type];
+    ctx.fillStyle = c.main;
+    ctx.fillRect(renderX, p.y, p.w, p.h);
+
+    // Draw right shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillRect(renderX + p.w - 18, p.y, 18, p.h);
+
+    // Grid details
+    ctx.strokeStyle = c.dark;
+    ctx.lineWidth = 1.5;
+    if (p.type === 'BRICK') {
+      for (let i = 15; i < p.h; i += 24) {
+        ctx.beginPath(); ctx.moveTo(renderX, p.y + i); ctx.lineTo(renderX + p.w, p.y + i); ctx.stroke();
+      }
+      for (let i = 0; i < p.w; i += 40) {
+        ctx.beginPath(); ctx.moveTo(renderX + i, p.y); ctx.lineTo(renderX + i, p.y + p.h); ctx.stroke();
+      }
+    } else if (p.type === 'STEEL') {
+      for (let i = 0; i < p.w; i += 60) {
+        ctx.beginPath(); ctx.moveTo(renderX + i, p.y); ctx.lineTo(renderX + i + 60, p.y + p.h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(renderX + i + 60, p.y); ctx.lineTo(renderX + i, p.y + p.h); ctx.stroke();
+      }
+    } else if (p.type === 'METAL') {
+      ctx.lineWidth = 1.0;
+      for (let i = 0; i < p.w; i += 12) {
+        ctx.beginPath(); ctx.moveTo(renderX + i, p.y); ctx.lineTo(renderX + i, p.y + p.h); ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = '#111';
+      for (let i = 40; i < p.w - 30; i += 60) {
+        for (let j = 35; j < p.h - 30; j += 70) {
+          ctx.fillRect(renderX + i, p.y + j, 24, 32);
+        }
+      }
+    }
+
+    // Hazard stripe decoration at top
+    const sw = 18;
+    for (let i = 0; i < p.w; i += sw * 2) {
+      ctx.fillStyle = '#d97706';
+      ctx.fillRect(renderX + i, p.y, Math.min(sw, p.w - i), 5);
+    }
+
+    // Chimney
+    ctx.fillStyle = '#111';
+    ctx.fillRect(renderX + p.w * 0.2, p.y - 30, 10, 30);
+  }
+
+  function drawCoin(c) {
+    if (c.collected) return;
+    const currentCameraX = player.globalX - player.x;
+    const renderX = c.x - currentCameraX;
+    if (renderX + c.r < -50 || renderX - c.r > V_W + 50) return;
+
+    c.t += 0.07;
+    ctx.save();
+    ctx.translate(renderX, c.y + Math.sin(c.t) * 5);
+    ctx.shadowColor = 'rgba(251, 191, 36, 0.7)';
+    ctx.shadowBlur = 12;
+    ctx.font = '28px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🤑', 0, 0);
+    ctx.restore();
+  }
+
+  let particles = [];
+
+  function spawnLandParticles(x, y) {
+    for (let i = 0; i < 8; i++) {
+      particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 5,
+        vy: -Math.random() * 4 - 1,
+        life: 1,
+        r: 2 + Math.random() * 4,
+        col: `hsl(30, 80%, ${40 + Math.random() * 30}%)`
+      });
+    }
+  }
+
+  function updateParticles() {
+    particles = particles.filter(p => p.life > 0);
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.18;
+      p.life -= 0.05;
+    });
+  }
+
+  function drawParticles() {
+    particles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.col;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  let floatingTexts = [];
+
+  function spawnFloatingText(x, y, text, color) {
+    floatingTexts.push({
+      x, y, text, color,
+      vy: -2,
+      life: 1.0,
+      scale: 1.0
+    });
+  }
+
+  function updateAndDrawFloatingTexts() {
+    floatingTexts = floatingTexts.filter(t => t.life > 0);
+    floatingTexts.forEach(t => {
+      t.y += t.vy;
+      t.life -= 0.025;
+      t.scale += 0.005;
+      
+      ctx.save();
+      ctx.globalAlpha = t.life;
+      ctx.fillStyle = t.color;
+      ctx.font = `bold ${Math.round(18 * t.scale)}px 'Courier Prime', monospace`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 4;
+      ctx.fillText(t.text, t.x, t.y);
+      ctx.restore();
+    });
+  }
+
+  function initGame() {
+    speed = BASE_SPEED;
+    frameCount = 0;
+    money = 0;
+
+    player.globalX = 150;
+    syncFixedPlatforms();
+
+    player.y = platforms[0].y - PLAYER_H - 10;
+    player.vy = 0; player.rot = 0; player.targetRot = 0;
+    player.grounded = false;
+
+    floatingTexts = [];
+    particles = [];
+
+    updateHUD();
+  }
+
+  function updateHUD() {
+    document.getElementById('hud-money').textContent = `BUDGET: $${money}`;
+    if (money % 3 === 0) {
+      document.getElementById('hud-sub').textContent = SLOGANS[Math.floor(Math.random()*SLOGANS.length)];
+    }
+    document.getElementById('hud-best').textContent = `BEST: $${bestScore}`;
+  }
+
+  function die() {
+    if (gState === 'DEAD') return;
+    gState = 'DEAD';
+    playSfx('death');
+    if (money > bestScore) bestScore = money;
+    updateHUD();
+
+    document.getElementById('lost-money').textContent = `$${money}`;
+    document.getElementById('death-reason').textContent = REASONS[Math.floor(Math.random()*REASONS.length)];
+    document.getElementById('death-quote').textContent = `"${QUOTES[Math.floor(Math.random()*QUOTES.length)]}"`;
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('death-screen').style.display = 'block';
+    document.getElementById('overlay').style.display = 'flex';
+
+    let n = 5;
+    const cd = document.getElementById('countdown');
+    cd.textContent = n;
+    const t = setInterval(() => {
+      n--;
+      cd.textContent = n;
+      if (n <= 0) { clearInterval(t); startGame(currentCharacter); }
+    }, 1000);
+  }
+
+  const aCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function playSfx(type) {
+    if (aCtx.state === 'suspended') return;
+    const osc = aCtx.createOscillator();
+    const gain = aCtx.createGain();
+    osc.connect(gain); gain.connect(aCtx.destination);
+    const now = aCtx.currentTime;
+    switch(type) {
+      case 'jump':
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(620, now+0.1);
+        gain.gain.setValueAtTime(0.06, now); gain.gain.exponentialRampToValueAtTime(0.001, now+0.12);
+        osc.start(); osc.stop(now+0.12); break;
+      case 'land':
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(90, now); osc.frequency.linearRampToValueAtTime(35, now+0.07);
+        gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.001, now+0.07);
+        osc.start(); osc.stop(now+0.07); break;
+      case 'coin':
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(820, now); osc.frequency.exponentialRampToValueAtTime(1400, now+0.1);
+        gain.gain.setValueAtTime(0.06, now); gain.gain.exponentialRampToValueAtTime(0.001, now+0.12);
+        osc.start(); osc.stop(now+0.12); break;
+      case 'death':
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, now); osc.frequency.linearRampToValueAtTime(8, now+0.55);
+        gain.gain.setValueAtTime(0.22, now); gain.gain.linearRampToValueAtTime(0.001, now+0.55);
+        osc.start(); osc.stop(now+0.55); break;
+    }
+  }
+
+  function loop() {
+    // Clear screen boundaries
+    ctx.clearRect(0, 0, W, H);
+
+    // Save and apply scalable virtual translation transform coordinate constraints
+    ctx.save();
+    ctx.scale(W / V_W, H / V_H);
+
+    updateBg(); 
+    drawBg();
+    updateParticles(); 
+    drawParticles();
+
+    if (gState === 'PLAYING') {
+      frameCount++;
+      speed += 0.0013;
+
+      player.globalX += speed;
+
+      syncFixedPlatforms();
+
+      // Coin collisions check
+      const currentCameraX = player.globalX - player.x;
+      coins.forEach(c => {
+        const coinScreenX = c.x - currentCameraX;
+        if (!c.collected &&
+            player.x < coinScreenX + c.r && player.x + player.w > coinScreenX - c.r &&
+            player.y < c.y + c.r && player.y + player.h > c.y - c.r) {
+          c.collected = true; 
+          money++;
+          updateHUD(); 
+          playSfx('coin');
+          spawnFloatingText(coinScreenX, c.y - 12, '+$1', '#4ade80');
+        }
+      });
+
+      physicsTick(player, true);
+
+      // Stream locations up to database path dynamically
+      if (databaseReady && frameCount % 4 === 0) {
+        broadcastCoordinates();
+      }
+    }
+
+    // Render level design assets
+    platforms.forEach(drawPlatform);
+    coins.forEach(drawCoin);
+
+    // Render other connected runners using Interpolated Dead Reckoning
+    updateAndDrawGhostPlayers();
+
+    // Render client local player
+    drawPlayer(player);
+
+    // Render all canvas floating status logs
+    updateAndDrawFloatingTexts();
+
+    // Red warning bottom guard line
+    ctx.fillStyle = 'rgba(239,68,68,0.1)';
+    ctx.fillRect(0, V_H - 4, V_W, 4);
+
+    ctx.restore(); // Restore context scale configuration to normal
+
+    requestAnimationFrame(loop);
+  }
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    drawStars();
+    initBg();
+  }
+
+  window.startGame = function(char) {
+    if (aCtx.state === 'suspended') aCtx.resume();
+    currentCharacter = char;
+
+    const randomShiftId = Math.floor(1000 + Math.random() * 9000);
+    mySessionUid = `${char}_${randomShiftId}`;
+
+    document.getElementById('overlay').style.display = 'none';
+    initGame();
+    gState = 'PLAYING';
+    
+    addSystemLog(`Welcome back to the Shift, ${char}!`);
+  };
+
+  function broadcastCoordinates() {
+    if (!databaseReady || !mySessionUid) return;
+
+    const myRef = ref(db, `vectors/${mySessionUid}`);
+    set(myRef, {
+      globalX: player.globalX,
+      y: player.y,
+      rot: player.rot,
+      character: currentCharacter,
+      timestamp: Date.now()
+    }).catch((err) => {
+      console.warn("Broadcasting error:", err);
+    });
+  }
+
+  function setupGhostListener() {
+    const vectorsRef = ref(db, 'vectors');
+    onValue(vectorsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const rawData = snapshot.val();
+        
+        // Count active online players in lobby
+        const activeCount = Object.keys(rawData).length;
+        document.getElementById("lobby-tag").textContent = `LOBBY: ${activeCount} WORKER(S) ACTIVE`;
+        document.getElementById("lobby-tag").style.color = activeCount > 1 ? "#3b82f6" : "#6b7280";
+
+        // Update local ghosts targets data map
+        Object.entries(rawData).forEach(([uid, entry]) => {
+          if (uid === mySessionUid) return;
+
+          if (!ghostPlayers[uid]) {
+            // First time seeing this player - initialize prediction/current variables
+            ghostPlayers[uid] = {
+              currentGlobalX: entry.globalX,
+              currentY: entry.y,
+              currentRot: entry.rot || 0,
+              targetGlobalX: entry.globalX,
+              targetY: entry.y,
+              targetRot: entry.rot || 0,
+              character: entry.character,
+              timestamp: entry.timestamp
+            };
+          } else {
+            // AUTHORITATIVE SYNC TARGETS UPDATE
+            ghostPlayers[uid].targetGlobalX = entry.globalX;
+            ghostPlayers[uid].targetY       = entry.y;
+            ghostPlayers[uid].targetRot     = entry.rot || 0;
+            ghostPlayers[uid].character     = entry.character;
+            ghostPlayers[uid].timestamp     = entry.timestamp;
+          }
+        });
+
+        // Clean up any players that left the DB
+        Object.keys(ghostPlayers).forEach(uid => {
+          if (!rawData[uid]) {
+            delete ghostPlayers[uid];
+          }
+        });
+      } else {
+        ghostPlayers = {};
+        document.getElementById("lobby-tag").textContent = `LOBBY: 1 WORKER ACTIVE`;
+      }
+    }, (error) => {
+      console.warn("Realtime sync issue:", error);
+    });
+  }
+
+  function addSystemLog(msg) {
+    const ticker = document.getElementById("death-ticker");
+    ticker.textContent = msg;
+    ticker.style.display = "block";
+    setTimeout(() => {
+      ticker.style.display = "none";
+    }, 4000);
+  }
+
+  window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); jump(); }});
+  window.addEventListener('mousedown', jump);
+  window.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
+  window.addEventListener('resize', resize);
+
+  resize();
+  loop();
+</script>
+</body>
+</html>
